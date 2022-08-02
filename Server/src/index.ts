@@ -1,15 +1,28 @@
 import express from 'express';
-import { WithPrisma } from './middleware/prisma.middleware';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
 import userRouter from './routes/user.route';
+import passport from 'passport';
+import cors from 'cors';
 
-const main = async () => {
-    const app = express();
-    app.use(express.json());
-    app.use(WithPrisma);
+const app = express();
 
-    app.use('/user', userRouter);
+// middleware
+app.use(express.json());
+app.use(
+    session({
+        secret: 'secret',
+        saveUninitialized: false,
+        resave: false,
+    })
+);
+app.use(cors({ credentials: 'include' }));
+app.use(passport.initialize());
+app.use(passport.session());
+require('./config/passport')(passport); // idk
 
-    app.listen(4000, () => console.log('Server started'));
-};
+// routes
+app.use('/user', userRouter);
 
-main().catch((error): any => console.log(error));
+// init
+app.listen(4000, () => console.log('Server started'));

@@ -1,18 +1,15 @@
-import { Client, ServiceResponse } from '../utils/types';
-import {
-    AuthenticationResponse,
-    LoginParams,
-    RegisterParams,
-} from '../utils/user.types';
+import { ServiceResponse } from '../utils/types';
+import { AuthenticationResponse, RegisterParams } from '../utils/user.types';
 import bcrypt from 'bcrypt';
 import { handleUniqueConstraintError } from '../utils/prisma.errors';
+import prisma from '../config/prisma.config';
 
 const SALT = 10; // TODO: env the salt
 
 /**
  * Get all the Users registed in the database
  */
-async function get(prisma: Client) {
+async function get() {
     return await prisma.user.findMany({
         select: {
             id: true,
@@ -27,10 +24,12 @@ async function get(prisma: Client) {
 /**
  * Registers a User to the client
  */
-async function register(
-    prisma: Client,
-    { email, firstName, lastName, password }: RegisterParams
-): Promise<ServiceResponse<AuthenticationResponse>> {
+async function register({
+    email,
+    firstName,
+    lastName,
+    password,
+}: RegisterParams): Promise<ServiceResponse<AuthenticationResponse>> {
     try {
         const hashedPassword = bcrypt.hashSync(password, SALT);
         const user = await prisma.user.create({
@@ -66,29 +65,28 @@ async function register(
 }
 
 /**
- * Logs in a User
- * TODO: Session for authentication
+ * Logs in a User. This function is used in the passport local strategy
+ * Any time passport.authenticate is called, this function is also called
  */
-async function login(prisma: Client, { email, password }: LoginParams) {
-    const user = await prisma.user.findFirst({ where: { email } });
+async function login(email: string, password: string, done: any) {
+    const user = await prisma.user.findUnique({ where: { email } });
+
     if (!user)
-        return {
-            errors: [
-                {
-                    field: 'email',
-                    message: `User with email ${email} not found.`,
-                },
-            ],
-        };
+        return done({
+            field: 'email',
+            message: `User with email ${email} not found`,
+        });
 
-    const { hashedPassword } = user;
-    // if the password is incorrect
-    if (!bcrypt.compareSync(password, hashedPassword))
-        return {
-            errors: [{ field: 'password', message: 'Incorrect password' }],
-        };
+    const { id, firstName, lastName } = user; // parse out the fields we want to return
 
-    return null;
+    // check password
+    if (bcrypt.compareSync(password, user.hashedPassword))
+        return done(null, user);
+    else
+        return done({
+            field: 'password',
+            message: 'Invalid password',
+        });
 }
 
 export default {
