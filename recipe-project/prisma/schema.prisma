@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider        = "prisma-client-js"
+    previewFeatures = ["referentialIntegrity"]
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+model Collection {
+    id            String               @id @default(cuid())
+    name          String
+    ratingCount   Int                  @default(0)
+    averageRating Float                @default(0.0)
+    creator       User                 @relation(fields: [creatorId], references: [id])
+    creatorId     String
+    followers     FollowedCollection[]
+}
+
+model Recipe {
+    id            String   @id @default(cuid())
+    title         String
+    source        String?
+    tags          Json? // for now using Json since MYSQL doesn't support scalar arrays
+    ratingCount   Int
+    averageRating Float
+    createdAt     DateTime @default(now())
+    content       Json // still deciding on how to store this - may use something else besides Json 
+    description   String
+}
+
+model FollowedCollection {
+    user         User       @relation(fields: [userId], references: [id])
+    userId       String
+    collection   Collection @relation(fields: [collectionId], references: [id])
+    collectionId String
+    followDate   DateTime   @default(now())
+
+    @@id([userId, collectionId])
+}
+
+// Necessary for Next auth
+model Account {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String?
+    access_token      String?
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String?
+    session_state     String?
+    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+    id                  String               @id @default(cuid())
+    name                String?
+    email               String?              @unique
+    emailVerified       DateTime?
+    image               String?
+    password            String
+    salt                String
+    accounts            Account[]
+    sessions            Session[]
+    createdCollections  Collection[]
+    followedCollections FollowedCollection[]
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}
